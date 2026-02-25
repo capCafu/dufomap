@@ -3,13 +3,14 @@
 # Copyright (C) 2024-now, RPL, KTH Royal Institute of Technology
 # Author: Qingwen Zhang  (https://kin-zhang.github.io/)
 #
-# This file is part of DUFOMap (https://github.com/KTH-RPL/dufomap) and 
+# This file is part of DUFOMap (https://github.com/KTH-RPL/dufomap) and
 # DynamicMap Benchmark (https://github.com/KTH-RPL/DynamicMap_Benchmark) projects.
-# If you find this repo helpful, please cite the respective publication as 
+# If you find this repo helpful, please cite the respective publication as
 # listed on the above website.
 
 # Description: Output Cleaned Map through Python API.
 """
+
 from pathlib import Path
 import os, fire, time
 from datetime import timedelta
@@ -23,34 +24,42 @@ try:
     from scipy.spatial import cKDTree
 except Exception:
     cKDTree = None
+
+
 def inv_pose_matrix(pose):
     inv_pose = np.eye(4)
     inv_pose[:3, :3] = pose[:3, :3].T
     inv_pose[:3, 3] = -pose[:3, :3].T.dot(pose[:3, 3])
     return inv_pose
 
-MIN_AXIS_RANGE = 0.2 # HARD CODED: remove ego vehicle points
-MAX_AXIS_RANGE = 50 # HARD CODED: remove far away points
+
+MIN_AXIS_RANGE = 0.2  # HARD CODED: remove ego vehicle points
+MAX_AXIS_RANGE = 50  # HARD CODED: remove far away points
 LAST_RUN_FRAMES = 0
+
 
 class DynamicMapData:
     def __init__(self, directory):
         self.scene_id = directory.split("/")[-1]
         self.directory = Path(directory) / "pcd"
-        self.pcd_files = [os.path.join(self.directory, f) for f in sorted(os.listdir(self.directory)) if f.endswith('.pcd')]
+        self.pcd_files = [
+            os.path.join(self.directory, f)
+            for f in sorted(os.listdir(self.directory))
+            if f.endswith(".pcd")
+        ]
 
     def __len__(self):
         return len(self.pcd_files)
-    
+
     def __getitem__(self, index_):
         res_dict = {
-            'scene_id': self.scene_id,
-            'timestamp': self.pcd_files[index_].split("/")[-1].split(".")[0],
+            "scene_id": self.scene_id,
+            "timestamp": self.pcd_files[index_].split("/")[-1].split(".")[0],
         }
         pcd_ = pcdpy3.PointCloud.from_path(self.pcd_files[index_])
-        pc0 = pcd_.np_data[:,:3]
-        res_dict['pc'] = pc0.astype(np.float32)
-        res_dict['pose'] = list(pcd_.viewpoint)
+        pc0 = pcd_.np_data[:, :3]
+        res_dict["pc"] = pc0.astype(np.float32)
+        res_dict["pose"] = list(pcd_.viewpoint)
         return res_dict
 
 
@@ -82,14 +91,6 @@ def _temporal_keep_mask(
             tree = cKDTree(ref_points, compact_nodes=False, balanced_tree=False)
             dists, _ = tree.query(query_points, k=1, workers=-1)
             return dists < float(dist_thresh)
-
-        # Fallback if scipy is unavailable: coarse voxel consistency.
-        voxel = float(dist_thresh)
-        q = np.floor(query_points / voxel).astype(np.int64)
-        r = np.floor(ref_points / voxel).astype(np.int64)
-        qh = q[:, 0] * 73856093 ^ q[:, 1] * 19349663 ^ q[:, 2] * 83492791
-        rh = r[:, 0] * 73856093 ^ r[:, 1] * 19349663 ^ r[:, 2] * 83492791
-        return np.isin(qh, np.unique(rh))
 
     prev_ok = _nn_mask(points, prev_points)
     next_ok = _nn_mask(points, next_points)
@@ -208,8 +209,10 @@ def main_vis(
 
     for data_id in (pbar := tqdm(range(0, len(dataset)), ncols=100)):
         data = _get_data(data_id)
-        now_scene_id = data['scene_id']
-        pbar.set_description(f"id: {data_id}, scene_id: {now_scene_id}, timestamp: {data['timestamp']}")
+        now_scene_id = data["scene_id"]
+        pbar.set_description(
+            f"id: {data_id}, scene_id: {now_scene_id}, timestamp: {data['timestamp']}"
+        )
 
         range_mask = _range_mask(
             data["pc"],
@@ -270,12 +273,14 @@ def main_vis(
         # Keep cache bounded.
         drop_idx = data_id - temporal_step - 1
         frame_cache.pop(drop_idx, None)
-    
+
     # STEP 2: propagate
     mydufo.oncePropagateCluster(if_propagate=True, if_cluster=False)
     # STEP 3: Map results; You can save the voxel map directly based on the resolution we set before:
     if cloud_acc_chunks:
-        cloud_acc = np.concatenate(cloud_acc_chunks, axis=0).astype(np.float32, copy=False)
+        cloud_acc = np.concatenate(cloud_acc_chunks, axis=0).astype(
+            np.float32, copy=False
+        )
     else:
         cloud_acc = np.zeros((0, 3), dtype=np.float32)
 
@@ -297,8 +302,9 @@ def main_vis(
         num_threads=num_threads,
     )
     mydufo.outputMap(cloud_acc, voxel_map=voxel_map, file_name=output_stem)
-    
+
     mydufo.printDetailTiming()
+
 
 if __name__ == "__main__":
     start_time = time.time()
@@ -306,7 +312,9 @@ if __name__ == "__main__":
     elapsed = time.time() - start_time
     print(f"Time used: {elapsed:.2f} s")
     if LAST_RUN_FRAMES > 0 and elapsed > 0:
-        print(f"Speed: {LAST_RUN_FRAMES / elapsed:.2f} Hz, {elapsed / LAST_RUN_FRAMES:.4f} s/frame")
+        print(
+            f"Speed: {LAST_RUN_FRAMES / elapsed:.2f} Hz, {elapsed / LAST_RUN_FRAMES:.4f} s/frame"
+        )
     else:
         print("Speed: n/a Hz, n/a s/frame")
     print(f"Time used (H:MM:SS): {timedelta(seconds=int(elapsed))}")
