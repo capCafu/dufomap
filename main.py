@@ -169,6 +169,20 @@ def main_vis(
     output_name: str = "dufomap_output",  # output basename used by dufomap API
     num_threads: int = 16,
 ):
+    temporal_mode = str(temporal_mode).lower()
+    if temporal_step < 0:
+        raise ValueError(f"temporal_step must be >= 0, got {temporal_step}")
+    if not (float(min_axis_range) < float(max_axis_range)):
+        raise ValueError(
+            "Expected min_axis_range < max_axis_range, got "
+            f"{min_axis_range} >= {max_axis_range}"
+        )
+    if temporal_mode not in {"none", "either", "both"}:
+        raise ValueError(
+            "temporal_mode must be one of {'none', 'either', 'both'}, got "
+            f"{temporal_mode!r}"
+        )
+
     dataset = DynamicMapData(data_dir)
     global LAST_RUN_FRAMES
     LAST_RUN_FRAMES = len(dataset)
