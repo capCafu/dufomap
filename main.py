@@ -69,8 +69,11 @@ def _range_mask(
     min_axis_range: float,
     max_axis_range: float,
 ) -> np.ndarray:
-    norm_pc0 = np.linalg.norm(points[:, :3] - np.asarray(pose[:3]), axis=1)
-    return (norm_pc0 > float(min_axis_range)) & (norm_pc0 < float(max_axis_range))
+    delta = points[:, :3] - np.asarray(pose[:3], dtype=points.dtype)
+    dist_sq = np.sum(delta * delta, axis=1)
+    min_sq = float(min_axis_range) ** 2
+    max_sq = float(max_axis_range) ** 2
+    return (dist_sq > min_sq) & (dist_sq < max_sq)
 
 
 def _temporal_keep_mask(
