@@ -20,22 +20,7 @@ from tqdm import tqdm
 from dufomap import dufomap
 from dufomap.utils import pcdpy3
 
-try:
-    from scipy.spatial import cKDTree
-except Exception:
-    cKDTree = None
-
-
-def inv_pose_matrix(pose):
-    inv_pose = np.eye(4)
-    inv_pose[:3, :3] = pose[:3, :3].T
-    inv_pose[:3, 3] = -pose[:3, :3].T.dot(pose[:3, 3])
-    return inv_pose
-
-
-MIN_AXIS_RANGE = 0.2  # HARD CODED: remove ego vehicle points
-MAX_AXIS_RANGE = 50  # HARD CODED: remove far away points
-LAST_RUN_FRAMES = 0
+from scipy.spatial import cKDTree
 
 
 class DynamicMapData:
@@ -90,10 +75,9 @@ def _temporal_keep_mask(
         if ref_points.size == 0:
             return np.zeros(query_points.shape[0], dtype=bool)
 
-        if cKDTree is not None:
-            tree = cKDTree(ref_points, compact_nodes=False, balanced_tree=False)
-            dists, _ = tree.query(query_points, k=1, workers=-1)
-            return dists < float(dist_thresh)
+        tree = cKDTree(ref_points, compact_nodes=False, balanced_tree=False)
+        dists, _ = tree.query(query_points, k=1, workers=-1)
+        return dists < float(dist_thresh)
 
     prev_ok = _nn_mask(points, prev_points)
     next_ok = _nn_mask(points, next_points)
@@ -198,12 +182,6 @@ def main_vis(
     )
     cloud_acc_chunks = []
     frame_cache = {}
-
-    if temporal_mode != "none" and cKDTree is None:
-        print(
-            "[WARN] scipy not found. Temporal consistency uses coarse voxel fallback.",
-            flush=True,
-        )
 
     def _get_data(idx: int):
         if idx not in frame_cache:
